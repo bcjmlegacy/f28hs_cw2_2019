@@ -13,7 +13,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef int bool;
+#define TRUE    1
+#define FALSE   0
+
 int main(int argc, char *argv[])
 {
-    printf("What's up");
+    printf("%s\nF28HS Coursework 2\n\n", argv[0]);
+
+
 }
