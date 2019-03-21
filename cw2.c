@@ -16,10 +16,64 @@
 typedef int bool;
 #define TRUE    1
 #define FALSE   0
+#ifdef __unix__
+    #define OS 1    // Unix so use coloured terminal
+#else
+    #define OS 0    // Not Unix so don't use coloured terminal
+#endif
+
+// UNIX terminal colour codes
+// From https://stackoverflow.com/questions/3585846/color-text-in-terminal-applications-in-unix
+
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
+
+int DEBUG = FALSE;
+
+void printd(char* msg, int var)
+{
+    if(OS)  // If the OS is Unix, print using colours
+    {
+        printf(KRED);
+        printf("DEBUG: ");
+        printf(msg, var);
+        printf(KNRM);
+    }
+    else
+    {
+        printf("DEBUG: ");
+        printf(msg, var);
+    }
+}
 
 int main(int argc, char *argv[])
 {
-    printf("%s\nF28HS Coursework 2\n\n", argv[0]);
+    printf("%s: F28HS Coursework 2\n", argv[0]);
+
+    for (int x = 0; x < argc; x++) 
+    {
+        if (strcmp(argv[x], "-d") == 0)
+        {
+            DEBUG = TRUE;
+            printd("ACTIVE\n", 0);
+        }
+    }
+
+    int seq_length = 0;
+
+    printf("\nPlease input the length of the sequence: ");
+    scanf("%d", &seq_length);
+
+    if(DEBUG)
+    {
+        printd("Sequence length: %d\n", seq_length);
+    }
 
 
 }
