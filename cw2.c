@@ -2,11 +2,11 @@
     cw2.c
     F28HS Coursework 2
 
-    Author:         Benjamin Milne & Alakbar Zeynalzade
-    Inst.:          Heriot-Watt University
-    ID:             H00267054 & HXXXXXXXX
-    Contact:        bm56@hw.ac.uk & az40@hw.ac.uk
-    Date:           March, 2019
+    Author:     Benjamin Milne & Alakbar Zeynalzade
+    Inst.:      Heriot-Watt University
+    ID:         H00267054 & HXXXXXXXX
+    Contact:    bm56@hw.ac.uk & az40@hw.ac.uk
+    Date:       March, 2019
 */
 
 #include <stdio.h>
@@ -17,9 +17,13 @@ typedef int bool;
 #define TRUE    1
 #define FALSE   0
 #ifdef __unix__
-    #define OS 1    // Unix so use coloured terminal
+    // Unix so probably POSIX compliant and
+    //   supports colour codes.
+    #define UNIX TRUE
 #else
-    #define OS 0    // Not Unix so don't use coloured terminal
+    // Not Unix so don't know if we support
+    //   colour codes. Print without them.
+    #define UNIX FALSE    // Not Unix so don't use coloured terminal
 #endif
 
 // UNIX terminal colour codes
@@ -38,7 +42,7 @@ int DEBUG = FALSE;
 
 void printd(char* msg, int var)
 {
-    if(OS)  // If the OS is Unix, print using colours
+    if(UNIX)  // If the OS is Unix, print using colours
     {
         printf(KRED);
         printf("DEBUG: ");
@@ -62,6 +66,7 @@ int main(int argc, char *argv[])
         {
             DEBUG = TRUE;
             printd("ACTIVE\n", 0);
+            printd("UNIX? %d\n", ((UNIX) ? TRUE : FALSE));
         }
     }
 
