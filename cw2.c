@@ -2,9 +2,9 @@
     cw2.c
     F28HS Coursework 2
 
-    Author:     Benjamin Milne & Alakbar Zeynalzade
+    Authors:    Benjamin Milne & Alakbar Zeynalzade
     Inst.:      Heriot-Watt University
-    ID:         H00267054 & HXXXXXXXX
+    ID:         H00267054 & H00274131
     Contact:    bm56@hw.ac.uk & az40@hw.ac.uk
     Date:       March, 2019
 */

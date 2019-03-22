@@ -1,0 +1,9 @@
+.global _start
+
+_start:
+@ [program code here]
+
+_exit:
+	MOV R0, #65 @ [arbitrary value]
+	MOV R7, #1
+	SWI 0
