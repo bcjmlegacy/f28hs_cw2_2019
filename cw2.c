@@ -41,8 +41,9 @@ typedef int bool;
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-#define GPIOBASE 0x3F200000
-#define GPIOADDR "/dev/mem\000"
+//asm("\t.addr_file:	.word	.file\n"
+//    "\t.data\n"
+//    "\t.file:		.ascii \"/dev/mem\000\"\n");
 
 int DEBUG = FALSE;
 
@@ -64,12 +65,13 @@ void printd(char* msg, int var)
 
 void greenOn()
 {
-    int base = GPIOBASE;
-    char* addr = GPIOADDR;
-    asm("\n\tLDR, R0, %[base]\n" : [base] "r" (base) : "r0");
+    //int base = GPIOBASE;
+    //char* addr = GPIOADDR;
 
     printd("Turning GREEN ON\n", 0);
     //asm("\tSUB SP, SP, #16\n");
+    //asm("\tLDR R0, .addr_file\n");
+
 }
 
 int main(int argc, char *argv[])
