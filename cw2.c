@@ -10,8 +10,11 @@
 */
 
 #include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
 
 typedef int bool;
 #define TRUE    1
@@ -38,6 +41,9 @@ typedef int bool;
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
+#define GPIOBASE 0x3F200000
+#define GPIOADDR "/dev/mem\000"
+
 int DEBUG = FALSE;
 
 void printd(char* msg, int var)
@@ -56,11 +62,21 @@ void printd(char* msg, int var)
     }
 }
 
+void greenOn()
+{
+    int base = GPIOBASE;
+    char* addr = GPIOADDR;
+    asm("\n\tLDR, R0, %[base]\n" : [base] "r" (base) : "r0");
+
+    printd("Turning GREEN ON\n", 0);
+    //asm("\tSUB SP, SP, #16\n");
+}
+
 int main(int argc, char *argv[])
 {
     printf("%s: F28HS Coursework 2\n", argv[0]);
 
-    for (int x = 0; x < argc; x++) 
+    for (int x = 0; x < argc; x++)
     {
         if (strcmp(argv[x], "-d") == 0)
         {
@@ -79,6 +95,8 @@ int main(int argc, char *argv[])
     {
         printd("Sequence length: %d\n", seq_length);
     }
+
+    greenOn();
 
 
 }
