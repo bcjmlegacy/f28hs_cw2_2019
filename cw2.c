@@ -10,15 +10,29 @@
 */
 
 #include <stdio.h>
-#include <signal.h>
-#include <stdlib.h>
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <poll.h>
+#include <unistd.h>
+#include <errno.h>
 #include <string.h>
+#include <time.h>
+#include <fcntl.h>
+#include <pthread.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/ioctl.h>
 
-typedef int bool;
-#define TRUE    1
-#define FALSE   0
+#ifndef TRUE
+    typedef int bool;
+    #define TRUE    1
+    #define FALSE   0
+#endif
+
 #ifdef __unix__
     // Unix so probably POSIX compliant and
     //   supports colour codes.
@@ -41,9 +55,18 @@ typedef int bool;
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
-//asm("\t.addr_file:	.word	.file\n"
-//    "\t.data\n"
-//    "\t.file:		.ascii \"/dev/mem\000\"\n");
+#define GLED    13
+#define RLED    5
+#define BUTTON  19
+
+#define	PAGE_SIZE		(4*1024)
+#define	BLOCK_SIZE		(4*1024)
+
+#define	INPUT			 0
+#define	OUTPUT			 1
+
+static volatile unsigned int gpiobase ;
+static volatile uint32_t *gpio ;
 
 int DEBUG = FALSE;
 
@@ -51,7 +74,7 @@ void printd(char* msg, int var)
 {
     if(UNIX)  // If the OS is Unix, print using colours
     {
-        printf(KRED);
+        printf(KYEL);
         printf("DEBUG: ");
         printf(msg, var);
         printf(KNRM);
@@ -63,22 +86,60 @@ void printd(char* msg, int var)
     }
 }
 
+void initLED()
+{
+
+    if(DEBUG)
+    {
+	    printd("Init LED\n", 0);
+    }
+
+    int fd;
+
+    if ((fd = open ("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC) ) < 0)
+    {
+        printd("Cannot open /dev/mem. Try sudo\n", 0);
+        exit(1);
+    }
+
+    // GPIO:
+    gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, gpiobase) ;
+    if((int32_t)gpio == -1)
+    {
+        printd("mmap failed\n", 0);
+        exit(1);
+    }
+
+}
+
 void greenOn()
 {
-    //int base = GPIOBASE;
-    //char* addr = GPIOADDR;
+    if(DEBUG)
+    {
+	    printd("", 0);
+	    printf(KGRN "GREEN ON\n" KNRM);
+    }
+}
 
-    printd("Turning GREEN ON\n", 0);
-    asm("\tMOV	R0, #16\n" : "r0");
-
-    //asm("\tSUB SP, SP, #16\n");
-    //asm("\tLDR R0, .addr_file\n");
-
+void redOn()
+{
+    if(DEBUG)
+    {
+        printd("", 0);
+        printf(KRED "RED ON\n" KNRM);
+    }
 }
 
 int main(int argc, char *argv[])
 {
     printf("%s: F28HS Coursework 2\n", argv[0]);
+
+    // Check if being run in sudo
+    if (geteuid () != 0)
+    {
+        printd("User not sudo!\n", 0);
+        exit(1);
+    }
 
     for (int x = 0; x < argc; x++)
     {
@@ -100,7 +161,8 @@ int main(int argc, char *argv[])
         printd("Sequence length: %d\n", seq_length);
     }
 
+    initLED();
     greenOn();
-
+    redOn();
 
 }
