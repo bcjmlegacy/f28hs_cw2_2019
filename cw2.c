@@ -27,6 +27,14 @@
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 
+// ================================
+// Define TRUE / FALSE and check
+// type of OS.
+// NB: Realised later that this was irrelevant because we will
+//      always be using an RPi2 for this code, so of course it's
+//      not going to be run on Windows! But left this here because
+//      we put effort into it. 
+
 #ifndef TRUE
     typedef int bool;
     #define TRUE    1
@@ -43,6 +51,7 @@
     #define UNIX FALSE    // Not Unix so don't use coloured terminal
 #endif
 
+// ============================================================================================
 // UNIX terminal colour codes
 // From https://stackoverflow.com/questions/3585846/color-text-in-terminal-applications-in-unix
 
@@ -55,6 +64,9 @@
 #define KCYN  "\x1B[36m"
 #define KWHT  "\x1B[37m"
 
+// ==============================
+// GPIO setup
+
 #define GLED    13
 #define RLED    5
 #define BUTTON  19
@@ -65,8 +77,28 @@
 #define	INPUT			 0
 #define	OUTPUT			 1
 
-static volatile unsigned int gpiobase ;
-static volatile uint32_t *gpio ;
+#define OFF  10
+#define ON 7
+
+static volatile unsigned int gpiobase = 0x3F200000;
+static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, not for the itimer itself
+
+// =========================================================
+// Timer setup
+
+#ifdef ASM
+// System call codes
+#define SETITIMER 104
+#define GETITIMER 105
+#define SIGACTION 67
+#endif
+
+// In micro-sec
+#define DELAY 250000
+
+static uint64_t startT, stopT;
+
+// =========================================================
 
 int DEBUG = FALSE;
 
@@ -89,11 +121,7 @@ void printd(char* msg, int var)
 void initLED()
 {
 
-<<<<<<< HEAD
-    if(DEBUG)
-    {
-	    printd("Init LED\n", 0);
-    }
+    if(DEBUG) printd("Init LED\n", 0);
 
     int fd;
 
@@ -102,22 +130,8 @@ void initLED()
         printd("Cannot open /dev/mem. Try sudo\n", 0);
         exit(1);
     }
-=======
 
     static volatile int val = 1024, val2, val3;
-
-    printd("Turning GREEN ON\n", 0);
-    asm(
-        "\tMOV eax, #16\n" 
-        "\teax");
-
-    asm(/* multi-line example */
-      "\tMOV R0, %[value]\n"         /* load the address into R0 */ 
-      "\tLDR %[result], [R0, #0]\n"  /* get and return the value at that address */
-      : [result] "=r" (val3) 
-      : [value] "r" (&val)
-      : "eax", "cc" );
->>>>>>> 4ed7e8fa09dfec090e23deebbb739ab1d443734c
 
     // GPIO:
     gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, gpiobase) ;
@@ -127,28 +141,155 @@ void initLED()
         exit(1);
     }
 
+    uint32_t res;
+
+    // BCM 13
+    int g_fSel    = 1;   // GPIO Register 1
+    int g_shift   = 9;   // Bits 11-9
+
+    // BCM 5
+    int r_fSel    = 0;   // GPIO Register 0
+    int r_shift   = 15;  // Bits 17-15
+
+    if(DEBUG) printd("Setting GREEN LED to OUTPUT\n",0);
+
+    asm(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[g_fSel]\n"
+        "\tLDR R1, [R0, #0]\n"
+        "\tMOV R2, #0b111\n"
+        "\tLSL R2, %[g_shift]\n"
+        "\tBIC R1, R1, R2\n"
+        "\tMOV R2, #1\n"
+        "\tLSL R2, %[g_shift]\n"
+        "\tORR R1, R2\n"
+        "\tSTR R1, [R0, #0]\n"
+        "\tMOV %[result], R1\n"
+        : [result] "=r" (res)
+        : [gled] "r" (GLED)
+        , [gpio] "m" (gpio)
+        , [g_fSel] "r" (g_fSel*4)
+        , [g_shift] "r" (g_shift)
+        : "r0", "r1", "r2", "cc");
+
+    if(DEBUG) printd("Setting RED LED to OUTPUT\n",0);
+
+    asm(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[r_fSel]\n"
+        "\tLDR R1, [R0, #0]\n"
+        "\tMOV R2, #0b111\n"
+        "\tLSL R2, %[r_shift]\n"
+        "\tBIC R1, R1, R2\n"
+        "\tMOV R2, #1\n"
+        "\tLSL R2, %[r_shift]\n"
+        "\tORR R1, R2\n"
+        "\tSTR R1, [R0, #0]\n"
+        "\tMOV %[result], R1\n"
+        : [result] "=r" (res)
+        : [rled] "r" (RLED)
+        , [gpio] "m" (gpio)
+        , [r_fSel] "r" (r_fSel*4)
+        , [r_shift] "r" (r_shift)
+        : "r0", "r1", "r2", "cc");
+
 }
 
-void greenOn()
+void toggleGreen(int reg)
 {
     if(DEBUG)
     {
 	    printd("", 0);
-	    printf(KGRN "GREEN ON\n" KNRM);
+	    printf(KGRN "GREEN %d %s\n" KNRM, GLED, ((reg == 10) ? "OFF" : "ON"));
     }
+
+    uint32_t res;
+
+    asm volatile(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[reg]\n"
+        "\tMOV R2, #1\n"
+        "\tMOV R1, %[gled]\n"
+        "\tAND R1, #31\n"
+        "\tLSL R2, R1\n"
+        "\tSTR R2, [R0, #0]\n"
+        "\tMOV %[result], R2\n"
+        : [result] "=r" (res)
+        : [gled] "r" (GLED)
+        , [gpio] "m" (gpio)
+        , [reg] "r" (reg*4)
+        : "r0", "r1", "r2", "cc");
 }
 
-void redOn()
+void toggleRed(int reg)
 {
     if(DEBUG)
     {
         printd("", 0);
-        printf(KRED "RED ON\n" KNRM);
+        printf(KRED "RED %d %s\n" KNRM, RLED, ((reg == 10) ? "OFF" : "ON"));
     }
+
+    uint32_t res;
+
+    asm(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[reg]\n"
+        "\tMOV R2, #1\n"
+        "\tMOV R1, %[gled]\n"
+        "\tAND R1, #31\n"
+        "\tLSL R2, R1\n"
+        "\tSTR R2, [R0, #0]\n"
+        "\tMOV %[result], R2\n"
+        : [result] "=r" (res)
+        : [gled] "r" (RLED)
+        , [gpio] "m" (gpio)
+        , [reg] "r" (reg*4)
+        : "r0", "r1", "r2", "cc");
+}
+
+uint64_t timeInMicroseconds()
+{
+    struct timeval tv, tNow, tLong, tEnd;
+    uint64_t now;
+    gettimeofday(&tv, NULL);
+    now = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)tv.tv_usec;
+
+    return (uint64_t)now;
+}
+
+void timer_handler (int signum)
+{
+    static int count = 0;
+    stopT = timeInMicroseconds();
+    count++;
+    fprintf(stderr, "timer expired %d times; (measured interval %f sec)\n", count, (stopT-startT)/1000000.0);
+    startT = timeInMicroseconds();
+}
+
+static inline int getitimer_asm(int which, struct itimerval *curr_value)
+{
+    int res;
+
+    asm(
+        "\tB _bonzo105\n"
+        "_bonzo105: NOP\n"
+        "\tMOV R0, %[which]\n"
+        "\tLDR R1, %[buffer]\n"
+        "\tMOV R7, %[getitimer]\n"
+        "\tSWI 0\n"
+        "\tMOV %[result], R0\n"
+        : [result] "=r" (res)
+        : [buffer] "m" (curr_value)
+        , [which] "r" (ITIMER_REAL)
+        , [getitimer] "r" (GETITIMER)
+        : "r0", "r1", "r7", "cc");
+        
+    fprintf(stderr, "ASM: getitimer has returned a value of %d \n", res);
 }
 
 int main(int argc, char *argv[])
 {
+    system("clear");
     printf("%s: F28HS Coursework 2\n", argv[0]);
 
     // Check if being run in sudo
@@ -168,18 +309,39 @@ int main(int argc, char *argv[])
         }
     }
 
-    int seq_length = 0;
+    int code_length = 0;
+    int no_colours  = 0;
 
-    printf("\nPlease input the length of the sequence: ");
-    scanf("%d", &seq_length);
+    printf("\nPlease input the length of the code: ");
+    scanf("%d", &code_length);
 
-    if(DEBUG)
-    {
-        printd("Sequence length: %d\n", seq_length);
+    while(code_length < 3 || code_length> 10) {
+        printf("The code must be between 3 and 6 long!\n");
+        printf("\nPlease input the length of the code: ");
+        scanf("%d", &code_length);
     }
 
+    printf("Please input the number of colours: ");
+    scanf("%d", &no_colours);
+
+    while(no_colours < 3 || no_colours > 10) {
+        printf("Choose between 3 and 10 colours!\n");
+        printf("Please input the number of colours: ");
+        scanf("%d", &no_colours);
+    }
+
+    if(DEBUG) printd("Sequence length: %d\n", code_length);
+
     initLED();
-    greenOn();
-    redOn();
+    toggleGreen(OFF);
+    toggleRed(OFF);
+
+    
+    
+    
+
+
+    
+
 
 }
