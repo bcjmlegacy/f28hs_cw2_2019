@@ -68,8 +68,20 @@ void greenOn()
     //int base = GPIOBASE;
     //char* addr = GPIOADDR;
 
+
+    static volatile int val = 1024, val2, val3;
+
     printd("Turning GREEN ON\n", 0);
-    asm("\tMOV	R0, #16\n" : "r0");
+    asm(
+        "\tMOV eax, #16\n" 
+        "\teax");
+
+    asm(/* multi-line example */
+      "\tMOV R0, %[value]\n"         /* load the address into R0 */ 
+      "\tLDR %[result], [R0, #0]\n"  /* get and return the value at that address */
+      : [result] "=r" (val3) 
+      : [value] "r" (&val)
+      : "eax", "cc" );
 
     //asm("\tSUB SP, SP, #16\n");
     //asm("\tLDR R0, .addr_file\n");
