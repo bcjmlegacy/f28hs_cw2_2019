@@ -89,6 +89,7 @@ void printd(char* msg, int var)
 void initLED()
 {
 
+<<<<<<< HEAD
     if(DEBUG)
     {
 	    printd("Init LED\n", 0);
@@ -101,6 +102,22 @@ void initLED()
         printd("Cannot open /dev/mem. Try sudo\n", 0);
         exit(1);
     }
+=======
+
+    static volatile int val = 1024, val2, val3;
+
+    printd("Turning GREEN ON\n", 0);
+    asm(
+        "\tMOV eax, #16\n" 
+        "\teax");
+
+    asm(/* multi-line example */
+      "\tMOV R0, %[value]\n"         /* load the address into R0 */ 
+      "\tLDR %[result], [R0, #0]\n"  /* get and return the value at that address */
+      : [result] "=r" (val3) 
+      : [value] "r" (&val)
+      : "eax", "cc" );
+>>>>>>> 4ed7e8fa09dfec090e23deebbb739ab1d443734c
 
     // GPIO:
     gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, gpiobase) ;
