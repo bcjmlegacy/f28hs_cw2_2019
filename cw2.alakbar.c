@@ -115,9 +115,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    
-    system("clear");
-    printf("[PLAYER ONE]");
+    printf("\n\n[PLAYER ONE]");
 
     //CHOOSING LENGTHS OF CODE AND NUMBER OF COLOURS
     int code_length = 0;
