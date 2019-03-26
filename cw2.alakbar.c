@@ -9,12 +9,6 @@
     Date:       March, 2019
 */
 
-
-
-    #define _XOPEN_SOURCE
-    #include <unistd.h>
-
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -100,6 +94,8 @@ void CE(){
 
 int main(int argc, char *argv[])
 {
+
+    CE();
     printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
 
     // Check if being run in sudo
@@ -121,9 +117,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    
-    system("clear");
-    printf("[PLAYER ONE]");
+    printf("\n[PLAYER ONE]");
 
     //CHOOSING LENGTHS OF CODE AND NUMBER OF COLOURS
     int code_length = 0;
@@ -148,6 +142,11 @@ int main(int argc, char *argv[])
         scanf("%d", &no_colours);
     }
 
+    if(DEBUG)
+    {
+        printd("Sequence length: %d\n", code_length);
+    }
+
 
 
     //CHOOSING COLOURS
@@ -162,26 +161,22 @@ int main(int argc, char *argv[])
     }
 
 
-    printf("Your secret code is: \n");
+    printf("\nYour secret code is: \n");
     char *getpass(const char *prompt);
 
+    printf("[ ");
 
     for(i = 0; i < no_colours; i++)
     {
-        printf("");
+        printf("%d ", colours[i]);
     }
 
+    printf("]\n\nChanging to PLAYER TWO in five seconds...\n");
 
+    sleep(5);
 
-    //
-    printf("[PLAYER TWO]");
+    CE();
+    printf("\n[PLAYER TWO]");
 
-
-
-
-
-    if(DEBUG)
-    {
-        printd("Sequence length: %d\n", code_length);
-    }
+    
 }
