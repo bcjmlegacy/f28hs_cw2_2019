@@ -9,12 +9,6 @@
     Date:       March, 2019
 */
 
-
-
-    #define _XOPEN_SOURCE
-    #include <unistd.h>
-
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -40,8 +34,7 @@
 #endif
 
 #ifdef __unix__
-    // Unix so probably POSIX compliant and
-    //   supports colour codes.
+    // Unix so probably POSIX compliant and supports colour codes.
     #define UNIX TRUE
 #else
     // Not Unix so don't know if we support
@@ -51,7 +44,6 @@
 
 // UNIX terminal colour codes
 // From https://stackoverflow.com/questions/3585846/color-text-in-terminal-applications-in-unix
-
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 #define KGRN  "\x1B[32m"
@@ -92,14 +84,25 @@ void printd(char* msg, int var)
     }
 }
 
-//Clear the terminal screen of all characters
-void CE(){
+//Clear the terminal screen of all characters.
+//Unnecessary to be a separate function?
+//Yes.
+void CE()
+{
     system("clear");
 }
 
+void instructions()
+{
 
+}
+
+//This is the main method
 int main(int argc, char *argv[])
 {
+    //Clear terminal screen
+    CE();    
+    
     printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
 
     // Check if being run in sudo
@@ -121,11 +124,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    
-    system("clear");
-    printf("[PLAYER ONE]");
+    printf("\n\n[PLAYER ONE]");
 
-    //CHOOSING LENGTHS OF CODE AND NUMBER OF COLOURS
+    //Choosing length of code and number of colours
     int code_length = 0;
     int no_colours  = 0;
 
@@ -148,40 +149,47 @@ int main(int argc, char *argv[])
         scanf("%d", &no_colours);
     }
 
-
-
-    //CHOOSING COLOURS
-    int colours[no_colours];
-    int i;
-
-    for(i = 0; i < no_colours; i++)
-    {
-        printf("Choose the colour for position %d: ", i+1);
-        scanf("%d", &colours[i]);
-        //printf("%d", colours[i]);
-    }
-
-
-    printf("Your secret code is: \n");
-    char *getpass(const char *prompt);
-
-
-    for(i = 0; i < no_colours; i++)
-    {
-        printf("");
-    }
-
-
-
-    //
-    printf("[PLAYER TWO]");
-
-
-
-
-
     if(DEBUG)
     {
         printd("Sequence length: %d\n", code_length);
     }
+
+
+
+    //Choosing colours
+    int colours[no_colours];
+    int i;
+    int temp;
+
+    for(i = 0; i < no_colours; i++)
+    {
+        printf("Choose the colour for position %d: ", i+1);
+        scanf("%d", &temp);
+
+        while(temp < 1 || temp > 3)
+        {
+            printf("\nChoose a number between 1 and 3: ");
+            scanf("%d", &temp);
+        }
+        colours[i] = temp;
+    }
+
+    //Briefly displays secret code for player one to check
+    printf("\nYour secret code is: \n");
+    char *getpass(const char *prompt);
+
+    printf("[ ");
+
+    for(i = 0; i < no_colours; i++)
+    {
+        printf("%d ", colours[i]);
+    }
+
+    printf("]\n\nChanging to PLAYER TWO in five seconds...\n");
+
+    sleep(5);
+
+    CE();
+    printf("\n[PLAYER TWO]\n\nYou will have 5 tries to guess the correct code.");
+
 }
