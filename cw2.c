@@ -74,11 +74,11 @@
 #define	PAGE_SIZE		(4*1024)
 #define	BLOCK_SIZE		(4*1024)
 
-#define	INPUT			 0
-#define	OUTPUT			 1
+#define	INPUT   0
+#define	OUTPUT	1
 
-#define OFF  10
-#define ON 7
+#define OFF     10
+#define ON      7
 
 static volatile unsigned int gpiobase = 0x3F200000;
 static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, not for the itimer itself
@@ -86,15 +86,10 @@ static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, n
 // =========================================================
 // Timer setup
 
-#ifdef ASM
 // System call codes
 #define SETITIMER 104
 #define GETITIMER 105
 #define SIGACTION 67
-#endif
-
-// In micro-sec
-#define DELAY 250000
 
 static uint64_t startT, stopT;
 
@@ -118,10 +113,10 @@ void printd(char* msg, int var)
     }
 }
 
-void initLED()
+void initIO()
 {
 
-    if(DEBUG) printd("Init LED\n", 0);
+    if(DEBUG) printd("Initializing I/O Devices\n", 0);
 
     int fd;
 
@@ -287,10 +282,73 @@ static inline int getitimer_asm(int which, struct itimerval *curr_value)
     fprintf(stderr, "ASM: getitimer has returned a value of %d \n", res);
 }
 
+static inline int setitimer_asm(int which, const struct itimerval *new_value, struct itimerval *old_value) {
+
+    int res;
+
+    fprintf(stderr, "ASM: calling setitimer with this struct itimerval contents: %d secs %d micro-secs \n", 
+    new_value->it_interval.tv_sec, new_value->it_interval.tv_usec);
+
+    asm(
+        "\tB _bonzo104\n"
+        "_bonzo104: NOP\n"
+        "\tMOV R0, %[which]\n"
+        "\tLDR R1, %[buffer1]\n"
+        "\tLDR R2, %[buffer2]\n"
+        "\tMOV R7, %[setitimer]\n"
+        "\tSWI 0\n"
+        "\tMOV %[result], R0\n"
+        : [result] "=r" (res)
+        : [buffer1] "m" (new_value)
+        , [buffer2] "m" (old_value)
+        , [which] "r" (ITIMER_REAL)
+        , [setitimer] "r" (SETITIMER)
+        : "r0", "r1", "r2", "r7", "cc");
+
+    fprintf(stderr, "ASM: setitimer has returned a value of %d \n", res);
+}
+
+int sigaction_asm(int signum, const struct sigaction *act, struct sigaction *oldact){
+    int res;
+
+    asm(
+        "\tB _bonzo67\n"
+        "_bonzo67: NOP\n"
+        "\tMOV R0, %[signum]\n"
+        "\tLDR R1, %[buffer1]\n"
+        "\tLDR R2, %[buffer2]\n"
+        "\tMOV R7, %[sigaction]\n"
+        "\tSWI 0\n"
+        "\tMOV %[result], R0\n"
+        : [result] "=r" (res)
+        : [buffer1] "m" (act)
+        , [buffer2] "m" (oldact)
+        , [signum] "r" (signum)
+        , [sigaction] "r" (SIGACTION)
+        : "r0", "r1", "r2", "r7", "cc");
+    fprintf(stderr, "ASM: sigaction has returned a value of %d \n", res);
+}
+
 int main(int argc, char *argv[])
 {
     system("clear");
     printf("%s: F28HS Coursework 2\n", argv[0]);
+
+    struct sigaction sa;
+    struct itimerval timer;
+    sigaction_asm (SIGALRM, &sa, NULL);
+
+    memset (&sa, 0, sizeof (sa));
+    sa.sa_handler = &timer_handler;
+
+    timer.it_value.tv_sec = 0;
+    timer.it_value.tv_usec = 250000;
+
+    // timer.it_interval.tv_sec = 0;
+    // timer.it_interval.tv_usec = DELAY;
+
+    setitimer_asm(ITIMER_REAL, &timer, NULL);
+    // startT = timeInMicroseconds();
 
     // Check if being run in sudo
     if (geteuid () != 0)
@@ -332,7 +390,7 @@ int main(int argc, char *argv[])
 
     if(DEBUG) printd("Sequence length: %d\n", code_length);
 
-    initLED();
+    initIO();
     toggleGreen(OFF);
     toggleRed(OFF);
 
