@@ -34,8 +34,7 @@
 #endif
 
 #ifdef __unix__
-    // Unix so probably POSIX compliant and
-    //   supports colour codes.
+    // Unix so probably POSIX compliant and supports colour codes.
     #define UNIX TRUE
 #else
     // Not Unix so don't know if we support
@@ -45,7 +44,6 @@
 
 // UNIX terminal colour codes
 // From https://stackoverflow.com/questions/3585846/color-text-in-terminal-applications-in-unix
-
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
 #define KGRN  "\x1B[32m"
@@ -86,16 +84,25 @@ void printd(char* msg, int var)
     }
 }
 
-//Clear the terminal screen of all characters
-void CE(){
+//Clear the terminal screen of all characters.
+//Unnecessary to be a separate function?
+//Yes.
+void CE()
+{
     system("clear");
 }
 
-
-int main(int argc, char *argv[])
+void instructions()
 {
 
-    CE();
+}
+
+//This is the main method
+int main(int argc, char *argv[])
+{
+    //Clear terminal screen
+    CE();    
+    
     printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
 
     // Check if being run in sudo
@@ -117,9 +124,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("\n[PLAYER ONE]");
+    printf("\n\n[PLAYER ONE]");
 
-    //CHOOSING LENGTHS OF CODE AND NUMBER OF COLOURS
+    //Choosing length of code and number of colours
     int code_length = 0;
     int no_colours  = 0;
 
@@ -149,18 +156,25 @@ int main(int argc, char *argv[])
 
 
 
-    //CHOOSING COLOURS
+    //Choosing colours
     int colours[no_colours];
     int i;
+    int temp;
 
     for(i = 0; i < no_colours; i++)
     {
         printf("Choose the colour for position %d: ", i+1);
-        scanf("%d", &colours[i]);
-        //printf("%d", colours[i]);
+        scanf("%d", &temp);
+
+        while(temp < 1 || temp > 3)
+        {
+            printf("\nChoose a number between 1 and 3: ");
+            scanf("%d", &temp);
+        }
+        colours[i] = temp;
     }
 
-
+    //Briefly displays secret code for player one to check
     printf("\nYour secret code is: \n");
     char *getpass(const char *prompt);
 
@@ -176,7 +190,6 @@ int main(int argc, char *argv[])
     sleep(5);
 
     CE();
-    printf("\n[PLAYER TWO]");
+    printf("\n[PLAYER TWO]\n\nYou will have 5 tries to guess the correct code.");
 
-    
 }
