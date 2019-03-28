@@ -17,7 +17,7 @@ Listing 8.11 (itemer.c) Timer Example
 #include <sys/time.h>
 
 // in micro-sec
-#define DELAY 250000
+#define DELAY 999999
 
 static uint64_t startT, stopT;
 
@@ -52,24 +52,14 @@ int main ()
  /* Install timer_handler as the signal handler for SIGALRM. */
  memset (&sa, 0, sizeof (sa));
  sa.sa_handler = &timer_handler;
- // ORIG: sigaction (SIGVTALRM, &sa, NULL);
- /* From the man page:
-       The  sigaction()  system  call  is used to change the action taken by a
-       process on receipt of a specific signal.  (See signal(7) for  an  over‐
-       view of signals.)
-       signum  specifies the signal and can be any valid signal except SIGKILL
-       and SIGSTOP.
-       If act is non-NULL, the new action for signal signum is installed  from
-       act.  If oldact is non-NULL, the previous action is saved in oldact.
 
- */
  sigaction (SIGALRM, &sa, NULL);
 
  /* Configure the timer to expire after 250 msec... */
- timer.it_value.tv_sec = 0;
+ timer.it_value.tv_sec = 10;
  timer.it_value.tv_usec = DELAY;
  /* ... and every 250 msec after that. */
- timer.it_interval.tv_sec = 0;
+ timer.it_interval.tv_sec = 10;
  timer.it_interval.tv_usec = DELAY;
  /* Start a virtual timer. It counts down whenever this process is executing. */
  // ORIG: setitimer (ITIMER_VIRTUAL, &timer, NULL);

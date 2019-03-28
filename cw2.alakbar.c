@@ -66,7 +66,7 @@
 static volatile unsigned int gpiobase ;
 static volatile uint32_t *gpio ;
 
-int DEBUG = FALSE;
+int DEBUG = TRUE;
 
 void printd(char* msg, int var)
 {
@@ -92,11 +92,6 @@ void CE()
     system("clear");
 }
 
-void instructions()
-{
-
-}
-
 //This is the main method
 int main(int argc, char *argv[])
 {
@@ -113,7 +108,6 @@ int main(int argc, char *argv[])
     }
 
     int x;
-
     for (x = 0; x < argc; x++)
     {
         if (strcmp(argv[x], "-d") == 0)
@@ -160,7 +154,6 @@ int main(int argc, char *argv[])
     int colours[no_colours];
     int i;
     int temp;
-
     for(i = 0; i < no_colours; i++)
     {
         printf("Choose the colour for position %d: ", i+1);
@@ -190,6 +183,29 @@ int main(int argc, char *argv[])
     sleep(5);
 
     CE();
-    printf("\n[PLAYER TWO]\n\nYou will have 5 tries to guess the correct code.");
+    printf("\n[PLAYER TWO]\n\nYou have 5 tries to guess the correct code.\n");
 
+    if(DEBUG)
+    {
+        printd("[ ", 0);
+
+        for(i = 0; i < no_colours; i++)
+        {
+            printf("%d ", colours[i]);
+        }
+
+        printf("]\n", 0);
+    }
+
+    printf("\n");
+
+
+    int turnNumber[5];
+    int guess[3];
+
+    for(i = 0; i < no_colours; i++)
+    {
+        printf("Enter your guess for position %d: ", i+1);
+        scanf("%d", &guess[i]);
+    }
 }

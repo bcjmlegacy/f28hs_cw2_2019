@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 // ================================
 // Define TRUE / FALSE and check
@@ -50,6 +51,8 @@
     //   colour codes. Print without them.
     #define UNIX FALSE    // Not Unix so don't use coloured terminal
 #endif
+
+int DEBUG = FALSE;
 
 // ============================================================================================
 // UNIX terminal colour codes
@@ -91,24 +94,26 @@ static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, n
 #define GETITIMER 105
 #define SIGACTION 67
 
+#define DELAY 3
+
 static uint64_t startT, stopT;
+static bool finished = FALSE;
 
 // =========================================================
 
-int DEBUG = FALSE;
 
 void printd(char* msg, int var)
 {
     if(UNIX)  // If the OS is Unix, print using colours
     {
         printf(KYEL);
-        printf("DEBUG: ");
+        printf("=debug=: ");
         printf(msg, var);
         printf(KNRM);
     }
     else
     {
-        printf("DEBUG: ");
+        printf("=debug=: ");
         printf(msg, var);
     }
 }
@@ -116,13 +121,13 @@ void printd(char* msg, int var)
 void initIO()
 {
 
-    if(DEBUG) printd("Initializing I/O Devices\n", 0);
+    if(DEBUG) printd("Initializing I/O Devices...\n", 0);
 
     int fd;
 
     if ((fd = open ("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC) ) < 0)
     {
-        printd("Cannot open /dev/mem. Try sudo\n", 0);
+        printd("Cannot open /dev/mem! Sudo?\n", 0);
         exit(1);
     }
 
@@ -132,21 +137,24 @@ void initIO()
     gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, gpiobase) ;
     if((int32_t)gpio == -1)
     {
-        printd("mmap failed\n", 0);
+        printd("mmap failed!\n", 0);
         exit(1);
     }
 
     uint32_t res;
 
     // BCM 13
-    int g_fSel    = 1;   // GPIO Register 1
-    int g_shift   = 9;   // Bits 11-9
+    int g_fSel  = 1;   // GPIO Register 1
+    int g_shift = 9;   // Bits 11-9
 
     // BCM 5
-    int r_fSel    = 0;   // GPIO Register 0
-    int r_shift   = 15;  // Bits 17-15
+    int r_fSel  = 0;   // GPIO Register 0
+    int r_shift = 15;  // Bits 17-15
 
-    if(DEBUG) printd("Setting GREEN LED to OUTPUT\n",0);
+    int b_fSel  = 1;   // GPIO Register 1
+    int b_shift = 27;  // Bits 27-29
+
+    if(DEBUG) printd("...setting GREEN LED to OUTPUT\n",0);
 
     asm(
         "\tLDR R1, %[gpio]\n"
@@ -167,13 +175,34 @@ void initIO()
         , [g_shift] "r" (g_shift)
         : "r0", "r1", "r2", "cc");
 
-    if(DEBUG) printd("Setting RED LED to OUTPUT\n",0);
+    if(DEBUG) printd("...setting RED LED to OUTPUT\n",0);
+
+    asm(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[b_fSel]\n"
+        "\tLDR R1, [R0, #0]\n"
+        "\tMOV R2, #0b111\n"
+        "\tLSL R2, %[b_shift]\n"
+        "\tBIC R1, R1, R2\n"
+        "\tMOV R2, #1\n"
+        "\tLSL R2, %[b_shift]\n"
+        "\tORR R1, R2\n"
+        "\tSTR R1, [R0, #0]\n"
+        "\tMOV %[result], R1\n"
+        : [result] "=r" (res)
+        : [button] "r" (BUTTON)
+        , [gpio] "m" (gpio)
+        , [b_fSel] "r" (b_fSel*4)
+        , [b_shift] "r" (b_shift)
+        : "r0", "r1", "r2", "cc");
+
+    if(DEBUG) printd("...setting BUTTON to INPUT\n",0);
 
     asm(
         "\tLDR R1, %[gpio]\n"
         "\tADD R0, R1, %[r_fSel]\n"
         "\tLDR R1, [R0, #0]\n"
-        "\tMOV R2, #0b111\n"
+        "\tMOV R2, #0b000\n"
         "\tLSL R2, %[r_shift]\n"
         "\tBIC R1, R1, R2\n"
         "\tMOV R2, #1\n"
@@ -188,6 +217,20 @@ void initIO()
         , [r_shift] "r" (r_shift)
         : "r0", "r1", "r2", "cc");
 
+    asm volatile(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[reg]\n"
+        "\tMOV R2, #1\n"
+        "\tMOV R1, %[button]\n"
+        "\tAND R1, #31\n"
+        "\tLSL R2, R1\n"
+        "\tSTR R2, [R0, #0]\n"
+        "\tMOV %[result], R2\n"
+        : [result] "=r" (res)
+        : [button] "r" (BUTTON)
+        , [gpio] "m" (gpio)
+        , [reg] "r" (10*4)
+        : "r0", "r1", "r2", "cc");
 }
 
 void toggleGreen(int reg)
@@ -242,113 +285,79 @@ void toggleRed(int reg)
         : "r0", "r1", "r2", "cc");
 }
 
+// adapted from wiringPi; only need for timing, not for the itimer itself
 uint64_t timeInMicroseconds()
 {
-    struct timeval tv, tNow, tLong, tEnd;
-    uint64_t now;
-    gettimeofday(&tv, NULL);
-    now = (uint64_t)tv.tv_sec * (uint64_t)1000000 + (uint64_t)tv.tv_usec;
+    struct timeval tv, tNow, tLong, tEnd ;
+    uint64_t now ;
+    // gettimeofday (&tNow, NULL) ;
+    gettimeofday (&tv, NULL) ;
+    now  = (uint64_t)tv.tv_sec * (uint64_t)100000 + (uint64_t)tv.tv_usec ; // in us
+    // now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ; // in ms
 
-    return (uint64_t)now;
+    return (uint64_t)now; // (now - epochMilli) ;
 }
 
 void timer_handler (int signum)
 {
-    static int count = 0;
+    if(DEBUG) printf(KYEL "0" KNRM);
+    finished = TRUE;
     stopT = timeInMicroseconds();
-    count++;
-    fprintf(stderr, "timer expired %d times; (measured interval %f sec)\n", count, (stopT-startT)/1000000.0);
     startT = timeInMicroseconds();
 }
 
-static inline int getitimer_asm(int which, struct itimerval *curr_value)
+int getInput()
 {
-    int res;
+    static int answer = 0;
+    struct sigaction sa;
+    struct itimerval timer;
 
-    asm(
-        "\tB _bonzo105\n"
-        "_bonzo105: NOP\n"
-        "\tMOV R0, %[which]\n"
-        "\tLDR R1, %[buffer]\n"
-        "\tMOV R7, %[getitimer]\n"
-        "\tSWI 0\n"
-        "\tMOV %[result], R0\n"
-        : [result] "=r" (res)
-        : [buffer] "m" (curr_value)
-        , [which] "r" (ITIMER_REAL)
-        , [getitimer] "r" (GETITIMER)
-        : "r0", "r1", "r7", "cc");
-        
-    fprintf(stderr, "ASM: getitimer has returned a value of %d \n", res);
+    /* Install timer_handler as the signal handler for SIGALRM. */
+    memset (&sa, 0, sizeof (sa));
+    sa.sa_handler = &timer_handler;
+
+    sigaction (SIGALRM, &sa, NULL);
+
+    /* Configure the timer to expire after 250 msec... */
+    timer.it_value.tv_sec = DELAY;
+    timer.it_value.tv_usec = 0;
+    /* ... and every 250 msec after that. */
+    timer.it_interval.tv_sec = DELAY;
+    timer.it_interval.tv_usec = 0;
+    /* Start a virtual timer. It counts down whenever this process is executing. */
+    // ORIG: setitimer (ITIMER_VIRTUAL, &timer, NULL);
+    setitimer (ITIMER_REAL, &timer, NULL);
+
+    /* Do busy work. */
+    startT = timeInMicroseconds();
+    finished = FALSE;
+
+    while(finished == FALSE)    {
+        scanf("%d", &answer);
+    }
+
+    if(answer == 0) {
+        getInput();
+    }
+
+    return answer;
 }
 
-static inline int setitimer_asm(int which, const struct itimerval *new_value, struct itimerval *old_value) {
+void checkBtn()
+{
 
-    int res;
-
-    fprintf(stderr, "ASM: calling setitimer with this struct itimerval contents: %d secs %d micro-secs \n", 
-    new_value->it_interval.tv_sec, new_value->it_interval.tv_usec);
-
-    asm(
-        "\tB _bonzo104\n"
-        "_bonzo104: NOP\n"
-        "\tMOV R0, %[which]\n"
-        "\tLDR R1, %[buffer1]\n"
-        "\tLDR R2, %[buffer2]\n"
-        "\tMOV R7, %[setitimer]\n"
-        "\tSWI 0\n"
-        "\tMOV %[result], R0\n"
-        : [result] "=r" (res)
-        : [buffer1] "m" (new_value)
-        , [buffer2] "m" (old_value)
-        , [which] "r" (ITIMER_REAL)
-        , [setitimer] "r" (SETITIMER)
-        : "r0", "r1", "r2", "r7", "cc");
-
-    fprintf(stderr, "ASM: setitimer has returned a value of %d \n", res);
-}
-
-int sigaction_asm(int signum, const struct sigaction *act, struct sigaction *oldact){
-    int res;
-
-    asm(
-        "\tB _bonzo67\n"
-        "_bonzo67: NOP\n"
-        "\tMOV R0, %[signum]\n"
-        "\tLDR R1, %[buffer1]\n"
-        "\tLDR R2, %[buffer2]\n"
-        "\tMOV R7, %[sigaction]\n"
-        "\tSWI 0\n"
-        "\tMOV %[result], R0\n"
-        : [result] "=r" (res)
-        : [buffer1] "m" (act)
-        , [buffer2] "m" (oldact)
-        , [signum] "r" (signum)
-        , [sigaction] "r" (SIGACTION)
-        : "r0", "r1", "r2", "r7", "cc");
-    fprintf(stderr, "ASM: sigaction has returned a value of %d \n", res);
 }
 
 int main(int argc, char *argv[])
 {
+    int code_length = 0;
+    int no_colours  = 0;
+    int chosenColour = 0;
+
     system("clear");
-    printf("%s: F28HS Coursework 2\n", argv[0]);
 
-    struct sigaction sa;
-    struct itimerval timer;
-    sigaction_asm (SIGALRM, &sa, NULL);
-
-    memset (&sa, 0, sizeof (sa));
-    sa.sa_handler = &timer_handler;
-
-    timer.it_value.tv_sec = 0;
-    timer.it_value.tv_usec = 250000;
-
-    // timer.it_interval.tv_sec = 0;
-    // timer.it_interval.tv_usec = DELAY;
-
-    setitimer_asm(ITIMER_REAL, &timer, NULL);
-    // startT = timeInMicroseconds();
+    // printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
+    printf("F28HS Coursework 2\n\n");
 
     // Check if being run in sudo
     if (geteuid () != 0)
@@ -366,9 +375,6 @@ int main(int argc, char *argv[])
             printd("UNIX? %d\n", ((UNIX) ? TRUE : FALSE));
         }
     }
-
-    int code_length = 0;
-    int no_colours  = 0;
 
     printf("\nPlease input the length of the code: ");
     scanf("%d", &code_length);
@@ -394,12 +400,11 @@ int main(int argc, char *argv[])
     toggleGreen(OFF);
     toggleRed(OFF);
 
-    
-    
-    
+    printf("Please input your selection: ");
 
+    chosenColour = getInput();
 
-    
+    printf("\n\nOPTION CHOSEN WAS: %d\n", chosenColour);
 
 
 }
