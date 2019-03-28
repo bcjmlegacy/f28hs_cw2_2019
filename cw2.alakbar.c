@@ -28,18 +28,18 @@
 #include <sys/ioctl.h>
 
 #ifndef TRUE
-    typedef int bool;
-    #define TRUE    1
-    #define FALSE   0
+typedef int bool;
+#define TRUE    1
+#define FALSE   0
 #endif
 
 #ifdef __unix__
-    // Unix so probably POSIX compliant and supports colour codes.
-    #define UNIX TRUE
+// Unix so probably POSIX compliant and supports colour codes.
+#define UNIX TRUE
 #else
-    // Not Unix so don't know if we support
-    //   colour codes. Print without them.
-    #define UNIX FALSE    // Not Unix so don't use coloured terminal
+// Not Unix so don't know if we support
+//   colour codes. Print without them.
+#define UNIX FALSE    // Not Unix so don't use coloured terminal
 #endif
 
 // UNIX terminal colour codes
@@ -57,28 +57,25 @@
 #define RLED    5
 #define BUTTON  19
 
-#define	PAGE_SIZE		(4*1024)
-#define	BLOCK_SIZE		(4*1024)
+#define    PAGE_SIZE        (4*1024)
+#define    BLOCK_SIZE        (4*1024)
 
-#define	INPUT			 0
-#define	OUTPUT			 1
+#define    INPUT             0
+#define    OUTPUT             1
 
-static volatile unsigned int gpiobase ;
-static volatile uint32_t *gpio ;
+static volatile unsigned int gpiobase;
+static volatile uint32_t *gpio;
 
 int DEBUG = TRUE;
 
-void printd(char* msg, int var)
-{
-    if(UNIX)  // If the OS is Unix, print using colours
+void printd(char *msg, int var) {
+    if (UNIX)  // If the OS is Unix, print using colours
     {
         printf(KYEL);
         printf("DEBUG: ");
         printf(msg, var);
         printf(KNRM);
-    }
-    else
-    {
+    } else {
         printf("DEBUG: ");
         printf(msg, var);
     }
@@ -87,31 +84,26 @@ void printd(char* msg, int var)
 //Clear the terminal screen of all characters.
 //Unnecessary to be a separate function?
 //Yes.
-void CE()
-{
+void CE() {
     system("clear");
 }
 
 //This is the main method
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     //Clear terminal screen
-    CE();    
-    
+    CE();
+
     printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
 
     // Check if being run in sudo
-    if (geteuid () != 0)
-    {
+    if (geteuid() != 0) {
         printd("User not sudo!\n", 0);
         exit(1);
     }
 
     int x;
-    for (x = 0; x < argc; x++)
-    {
-        if (strcmp(argv[x], "-d") == 0)
-        {
+    for (x = 0; x < argc; x++) {
+        if (strcmp(argv[x], "-d") == 0) {
             DEBUG = TRUE;
             printd("ACTIVE\n", 0);
             printd("UNIX? %d\n", ((UNIX) ? TRUE : FALSE));
@@ -122,13 +114,12 @@ int main(int argc, char *argv[])
 
     //Choosing length of code and number of colours
     int code_length = 0;
-    int no_colours  = 0;
+    int no_colours = 0;
 
     printf("\nPlease input the length of the code: ");
     scanf("%d", &code_length);
 
-    while(code_length < 3 || code_length > 6)
-    {
+    while (code_length < 3 || code_length > 6) {
         printf("The code must be between 3 and 6 long!\n");
         printf("\nPlease input the length of the code: ");
         scanf("%d", &code_length);
@@ -137,14 +128,13 @@ int main(int argc, char *argv[])
     printf("Please input the number of colours: ");
     scanf("%d", &no_colours);
 
-    while(no_colours < 3 || no_colours > 10) {
+    while (no_colours < 3 || no_colours > 10) {
         printf("Choose between 3 and 10 colours!\n");
         printf("Please input the number of colours: ");
         scanf("%d", &no_colours);
     }
 
-    if(DEBUG)
-    {
+    if (DEBUG) {
         printd("Sequence length: %d\n", code_length);
     }
 
@@ -154,13 +144,11 @@ int main(int argc, char *argv[])
     int colours[no_colours];
     int i;
     int temp;
-    for(i = 0; i < no_colours; i++)
-    {
-        printf("Choose the colour for position %d: ", i+1);
+    for (i = 0; i < no_colours; i++) {
+        printf("Choose the colour for position %d: ", i + 1);
         scanf("%d", &temp);
 
-        while(temp < 1 || temp > 3)
-        {
+        while (temp < 1 || temp > 3) {
             printf("\nChoose a number between 1 and 3: ");
             scanf("%d", &temp);
         }
@@ -173,8 +161,7 @@ int main(int argc, char *argv[])
 
     printf("[ ");
 
-    for(i = 0; i < no_colours; i++)
-    {
+    for (i = 0; i < no_colours; i++) {
         printf("%d ", colours[i]);
     }
 
@@ -185,12 +172,10 @@ int main(int argc, char *argv[])
     CE();
     printf("\n[PLAYER TWO]\n\nYou have 5 tries to guess the correct code.\n");
 
-    if(DEBUG)
-    {
+    if (DEBUG) {
         printd("[ ", 0);
 
-        for(i = 0; i < no_colours; i++)
-        {
+        for (i = 0; i < no_colours; i++) {
             printf("%d ", colours[i]);
         }
 
@@ -200,12 +185,22 @@ int main(int argc, char *argv[])
     printf("\n");
 
 
-    int turnNumber[5];
+    int turnNumber;
     int guess[3];
 
-    for(i = 0; i < no_colours; i++)
-    {
-        printf("Enter your guess for position %d: ", i+1);
-        scanf("%d", &guess[i]);
+    for (turnNumber = 0; turnNumber < 5; turnNumber++) {
+        
+        printf("\n[%d] | ", turnNumber + 1);
+
+        for (i = 0; i < no_colours; i++) {
+            scanf(" %d", &temp);
+
+            // while (temp < 1 || temp > 3) {
+            //     printf("\nChoose a number between 1 and 3: ");
+            //     scanf("%d", &temp);
+            // }
+
+            printf("%d ", temp);
+        }
     }
 }
