@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
             printf("%d ", colours[i]);
         }
 
-        printf("]\n", 0);
+        printf("]\n");
     }
 
     printf("\n");
