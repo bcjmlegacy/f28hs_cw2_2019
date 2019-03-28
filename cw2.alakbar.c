@@ -188,19 +188,33 @@ int main(int argc, char *argv[]) {
     int turnNumber;
     int guess[3];
 
+    //This is where the fun begins
     for (turnNumber = 0; turnNumber < 5; turnNumber++) {
         
-        printf("\n[%d] | ", turnNumber + 1);
+        printf("\nTURN [%d]\n--------\n", turnNumber + 1);
 
         for (i = 0; i < no_colours; i++) {
             scanf(" %d", &temp);
 
-            // while (temp < 1 || temp > 3) {
-            //     printf("\nChoose a number between 1 and 3: ");
-            //     scanf("%d", &temp);
-            // }
+            while (temp < 1 || temp > 3) {
+                printf("\nChoose a number between 1 and 3: ");
+                scanf("%d", &temp);
+            }
+            guess[i] = temp;
+        }
 
-            printf("%d ", temp);
+        printf("\n[%d] | %d %d %d\n", turnNumber + 1, guess[0], guess[1], guess[2]);
+
+
+        int correctPlace = 0;
+        int correctColour = 0;
+        
+        //Game logic goes here
+        for(i = 0; i < no_colours; i++){
+            if(guess[i] = colours[i]){
+                correctPlace++;
+            }
+            printf("\n%d\n",correctPlace);
         }
     }
 }
