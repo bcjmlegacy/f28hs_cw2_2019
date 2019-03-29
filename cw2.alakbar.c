@@ -187,6 +187,7 @@ int main(int argc, char *argv[]) {
 
     int turnNumber;
     int guess[3];
+
     int correctPlace = 0;
     int correctColour = 0;
     int j;
@@ -261,6 +262,7 @@ int main(int argc, char *argv[]) {
             printf("\n\nYou win!\n\n");
             exit(0);
         }
+
     }
 
     printf("\n\nYou lose :(\n\n");
