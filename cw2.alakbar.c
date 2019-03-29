@@ -202,10 +202,18 @@ int main(int argc, char *argv[])
 
     int turnNumber[5];
     int guess[3];
+    temp = 0;
 
     for(i = 0; i < no_colours; i++)
     {
         printf("Enter your guess for position %d: ", i+1);
-        scanf("%d", &guess[i]);
+        scanf("%d", &temp);
+
+        while(temp < 1 || temp > 3)
+        {
+            printf("\nChoose a number between 1 and 3: ");
+            scanf("%d", &temp);
+        }
+        guess[i] = temp;
     }
 }

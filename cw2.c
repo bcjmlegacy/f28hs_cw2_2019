@@ -34,7 +34,7 @@
 // NB: Realised later that this was irrelevant because we will
 //      always be using an RPi2 for this code, so of course it's
 //      not going to be run on Windows! But left this here because
-//      we put effort into it. 
+//      we put effort into it.
 
 #ifndef TRUE
     typedef int bool;
@@ -83,6 +83,7 @@ int DEBUG = FALSE;
 #define OFF     10
 #define ON      7
 
+static int btnCount = 0;
 static volatile unsigned int gpiobase = 0x3F200000;
 static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, not for the itimer itself
 
@@ -94,7 +95,7 @@ static volatile uint32_t *gpio;// adapted from wiringPi; only need for timing, n
 #define GETITIMER 105
 #define SIGACTION 67
 
-#define DELAY 3
+#define DELAY 5
 
 static uint64_t startT, stopT;
 static bool finished = FALSE;
@@ -216,21 +217,6 @@ void initIO()
         , [r_fSel] "r" (r_fSel*4)
         , [r_shift] "r" (r_shift)
         : "r0", "r1", "r2", "cc");
-
-    asm volatile(
-        "\tLDR R1, %[gpio]\n"
-        "\tADD R0, R1, %[reg]\n"
-        "\tMOV R2, #1\n"
-        "\tMOV R1, %[button]\n"
-        "\tAND R1, #31\n"
-        "\tLSL R2, R1\n"
-        "\tSTR R2, [R0, #0]\n"
-        "\tMOV %[result], R2\n"
-        : [result] "=r" (res)
-        : [button] "r" (BUTTON)
-        , [gpio] "m" (gpio)
-        , [reg] "r" (10*4)
-        : "r0", "r1", "r2", "cc");
 }
 
 void toggleGreen(int reg)
@@ -269,17 +255,17 @@ void toggleRed(int reg)
 
     uint32_t res;
 
-    asm(
+    asm volatile(
         "\tLDR R1, %[gpio]\n"
         "\tADD R0, R1, %[reg]\n"
         "\tMOV R2, #1\n"
-        "\tMOV R1, %[gled]\n"
+        "\tMOV R1, %[rled]\n"
         "\tAND R1, #31\n"
         "\tLSL R2, R1\n"
         "\tSTR R2, [R0, #0]\n"
         "\tMOV %[result], R2\n"
         : [result] "=r" (res)
-        : [gled] "r" (RLED)
+        : [rled] "r" (RLED)
         , [gpio] "m" (gpio)
         , [reg] "r" (reg*4)
         : "r0", "r1", "r2", "cc");
@@ -300,10 +286,54 @@ uint64_t timeInMicroseconds()
 
 void timer_handler (int signum)
 {
-    if(DEBUG) printf(KYEL "0" KNRM);
+    // if(DEBUG) printf(KYEL "0" KNRM);
     finished = TRUE;
     stopT = timeInMicroseconds();
     startT = timeInMicroseconds();
+}
+
+void checkBtn()
+{
+    int reg = 13;
+    int res = 0;
+
+    asm volatile(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[reg]\n"
+        "\tMOV R2, #1\n"
+        "\tMOV R1, %[button]\n"
+        "\tAND R1, #31\n"
+        "\tLSL R2, R1\n"
+        "\tSTR R2, [R0, #0]\n"
+        "\tMOV %[result], R2\n"
+        : [result] "=r" (res)
+        : [button] "r" (BUTTON)
+        , [gpio] "m" (gpio)
+        , [reg] "r" (reg*4)
+        : "r0", "r1", "r2", "cc");
+
+    asm volatile(
+        "\tLDR R1, %[gpio]\n"
+        "\tADD R0, R1, %[reg]\n"
+        "\tMOV R1, %[button]\n"
+        "\tLSL R2, R1\n"
+        // "\tSTR R2, [R0, #0]\n"
+        "\tMOV %[result], R2\n"
+        : [result] "=r" (res)
+        : [button] "r" (BUTTON)
+        , [gpio] "m" (gpio)
+        , [reg] "r" (reg*4)
+        : "r0", "r1", "r2", "cc");
+
+    printf("%d\n", res);
+
+    if ((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0)
+    {
+        btnCount++;
+        if(DEBUG) printd("\n%d BUTTON", btnCount);
+
+        while((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0) {}
+    }
 }
 
 int getInput()
@@ -312,20 +342,17 @@ int getInput()
     struct sigaction sa;
     struct itimerval timer;
 
-    /* Install timer_handler as the signal handler for SIGALRM. */
+    btnCount = 0;
+
     memset (&sa, 0, sizeof (sa));
     sa.sa_handler = &timer_handler;
 
     sigaction (SIGALRM, &sa, NULL);
 
-    /* Configure the timer to expire after 250 msec... */
     timer.it_value.tv_sec = DELAY;
     timer.it_value.tv_usec = 0;
-    /* ... and every 250 msec after that. */
     timer.it_interval.tv_sec = DELAY;
     timer.it_interval.tv_usec = 0;
-    /* Start a virtual timer. It counts down whenever this process is executing. */
-    // ORIG: setitimer (ITIMER_VIRTUAL, &timer, NULL);
     setitimer (ITIMER_REAL, &timer, NULL);
 
     /* Do busy work. */
@@ -333,31 +360,55 @@ int getInput()
     finished = FALSE;
 
     while(finished == FALSE)    {
-        scanf("%d", &answer);
+        checkBtn();
     }
 
+    answer = btnCount;
+
     if(answer == 0) {
-        getInput();
+        checkBtn();
     }
 
     return answer;
 }
 
-void checkBtn()
+void blinkGreen(int times)
 {
+    struct timespec tim, tim2;
+    tim.tv_sec  = 0;
+    tim.tv_nsec = 200000000; 
 
+    for(int i = 0; i < times; i++)
+    {
+        toggleGreen(ON);
+        nanosleep(&tim , &tim2);
+        toggleGreen(OFF);
+        nanosleep(&tim , &tim2);
+    }
+}
+
+void blinkRed(int times)
+{
+    struct timespec tim, tim2;
+    tim.tv_sec  = 0;
+    tim.tv_nsec = 200000000; 
+
+    for(int i = 0; i < times; i++)
+    {
+        toggleRed(ON);
+        nanosleep(&tim , &tim2);
+        toggleRed(OFF);
+        nanosleep(&tim , &tim2);
+    }
 }
 
 int main(int argc, char *argv[])
 {
-    int code_length = 0;
-    int no_colours  = 0;
-    int chosenColour = 0;
+    int code_length     = 0;
+    int no_colours      = 0;
+    int chosenColour    = 0;
 
     system("clear");
-
-    // printf("%s\n\nF28HS Coursework 2\n\n", argv[0]);
-    printf("F28HS Coursework 2\n\n");
 
     // Check if being run in sudo
     if (geteuid () != 0)
@@ -376,35 +427,97 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("\nPlease input the length of the code: ");
-    scanf("%d", &code_length);
+    initIO();
+    toggleRed(OFF);
+    toggleGreen(OFF);
 
-    while(code_length < 3 || code_length> 10) {
-        printf("The code must be between 3 and 6 long!\n");
-        printf("\nPlease input the length of the code: ");
-        scanf("%d", &code_length);
+    blinkGreen(1);
+    blinkRed(1);
+
+    printf("F28HS Coursework 2\n\n");
+
+    printf("Please input the length of the code [3 - 10]: ");
+    fflush(stdout);
+    // scanf("%d", &code_length);
+    code_length = getInput();
+    printf("%d\n", code_length);
+
+    while(code_length < 3 || code_length > 10) {
+        printf("The code must be between 3 and 10 digits long!\n");
+        printf("Please input the length of the code [3 - 10]: ");
+        fflush(stdout);
+        // scanf("%d", &code_length);
+        code_length = getInput();
+        printf("%d\n", code_length);
     }
 
-    printf("Please input the number of colours: ");
-    scanf("%d", &no_colours);
+    blinkRed(1);
+    // blinkGreen(code_length);
+
+    printf("Please input the number of colours [3 - 10]: ");
+    fflush(stdout);
+    no_colours = getInput();
+    printf("%d\n", no_colours);
 
     while(no_colours < 3 || no_colours > 10) {
         printf("Choose between 3 and 10 colours!\n");
-        printf("Please input the number of colours: ");
-        scanf("%d", &no_colours);
+        printf("Please input the number of colours [3 - 10]: ");
+        fflush(stdout);
+        no_colours = getInput();
+        printf("%d\n", no_colours);
     }
 
-    if(DEBUG) printd("Sequence length: %d\n", code_length);
+    blinkRed(1);
+    // blinkGreen(no_colours);
 
-    initIO();
-    toggleGreen(OFF);
-    toggleRed(OFF);
+    // ============================================================
+    // Choosing secret code
 
-    printf("Please input your selection: ");
+    // Choosing colours
+    int colours[no_colours];
+    int i;
+    int temp;
+    for(i = 0; i < no_colours; i++)
+    {
+        printf("Choose the colour for position %d: ", i+1);
+        fflush(stdout);
+        temp = getInput();
+        printf("%d\n", temp);
 
-    chosenColour = getInput();
+        while(temp < 1 || temp > no_colours)
+        {
+            printf("Choose a number between 1 and %d: ", no_colours);
+            fflush(stdout);
+            temp = getInput();
+            printf("%d\n", temp);
+        }
+        colours[i] = temp;
+        blinkRed(1);
+        // blinkGreen(temp);
+    }
 
-    printf("\n\nOPTION CHOSEN WAS: %d\n", chosenColour);
+    //Briefly displays secret code for player one to check
+    printf("Your secret code is: [ ");
+    for(i = 0; i < no_colours; i++)
+    {
+        printf("%d ", colours[i]);
+    }
+    printf("]\n");
 
+    sleep(3);
+
+    system("clear");
+
+    if(DEBUG) {
+        printd("Secret code:  ", 0);
+        for(i = 0; i < no_colours; i++)
+        {
+            printf(KYEL "%d  " KNRM, colours[i]);
+        }
+    }
+
+    printf("\n");
+
+    printf("=========================================\n");
 
 }
