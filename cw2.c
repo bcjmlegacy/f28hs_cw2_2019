@@ -52,7 +52,8 @@
     #define UNIX FALSE    // Not Unix so don't use coloured terminal
 #endif
 
-int DEBUG = FALSE;
+int DEBUG   = FALSE;
+int BDEBUG  = FALSE;
 
 // ============================================================================================
 // UNIX terminal colour codes
@@ -102,7 +103,7 @@ static bool finished = FALSE;
 
 // =========================================================
 
-
+// Function for printing debug messages
 void printd(char* msg, int var)
 {
     if(UNIX)  // If the OS is Unix, print using colours
@@ -119,6 +120,7 @@ void printd(char* msg, int var)
     }
 }
 
+// Function for setting up our GPIO devices
 void initIO()
 {
 
@@ -126,6 +128,7 @@ void initIO()
 
     int fd;
 
+    // Attempt to set up access to memory controlling GPIO...
     if ((fd = open ("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC) ) < 0)
     {
         printd("Cannot open /dev/mem! Sudo?\n", 0);
@@ -134,7 +137,7 @@ void initIO()
 
     static volatile int val = 1024, val2, val3;
 
-    // GPIO:
+    // mmap GPIO
     gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, gpiobase) ;
     if((int32_t)gpio == -1)
     {
@@ -143,6 +146,10 @@ void initIO()
     }
 
     uint32_t res;
+
+    // ===============================================================
+    //  For each device, set the appropriate bits in the corresponding
+    //  register to enable INPUT / OUTPUT mode
 
     // BCM 13
     int g_fSel  = 1;   // GPIO Register 1
@@ -219,6 +226,7 @@ void initIO()
         : "r0", "r1", "r2", "cc");
 }
 
+// Toggle the green LED on and off
 void toggleGreen(int reg)
 {
     if(DEBUG)
@@ -245,6 +253,7 @@ void toggleGreen(int reg)
         : "r0", "r1", "r2", "cc");
 }
 
+// Toggle the red LED on and off
 void toggleRed(int reg)
 {
     if(DEBUG)
@@ -271,19 +280,16 @@ void toggleRed(int reg)
         : "r0", "r1", "r2", "cc");
 }
 
-// adapted from wiringPi; only need for timing, not for the itimer itself
 uint64_t timeInMicroseconds()
 {
     struct timeval tv, tNow, tLong, tEnd ;
-    uint64_t now ;
-    // gettimeofday (&tNow, NULL) ;
-    gettimeofday (&tv, NULL) ;
-    now  = (uint64_t)tv.tv_sec * (uint64_t)100000 + (uint64_t)tv.tv_usec ; // in us
-    // now  = (uint64_t)tv.tv_sec * (uint64_t)1000 + (uint64_t)(tv.tv_usec / 1000) ; // in ms
-
-    return (uint64_t)now; // (now - epochMilli) ;
+    uint64_t now;
+    gettimeofday(&tv, NULL);
+    now = (uint64_t)tv.tv_sec * (uint64_t)100000 + (uint64_t)tv.tv_usec;
+    return (uint64_t)now;
 }
 
+// This method runs when the SIGALRM interupt is raised
 void timer_handler (int signum)
 {
     // if(DEBUG) printf(KYEL "0" KNRM);
@@ -292,11 +298,15 @@ void timer_handler (int signum)
     startT = timeInMicroseconds();
 }
 
+// Checks if the button has been pressed. Increments a counter
+//  if so.
 void checkBtn()
 {
     int reg = 13;
     int res = 0;
 
+
+    // Very bad inline ASM attempt
     // asm volatile(
     //     "\tLDR R1, %[gpio]\n"
     //     "\tADD R0, R1, %[reg]\n"
@@ -314,56 +324,61 @@ void checkBtn()
 
     // printf("%d\n", res);
 
+
+    // We cheated with the C implementation because we struggled for time.
     if ((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0)
     {
-        btnCount++;
-        if(DEBUG) printd("\n%d BUTTON", btnCount);
+        btnCount++;                                     // increment counter
+        if(BDEBUG) printd("\n%d BUTTON", btnCount);     // print handy debug message
+        fflush(stdout);                                 // flush output since we don't use a newline
 
-        while((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0) {}
+        // Wait until the button stops being pressed to avoid multiple readings
+        while((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0) {}  
     }
 }
 
+// Function handles getting input from the button and its timing
 int getInput()
 {
     static int answer = 0;
     struct sigaction sa;
     struct itimerval timer;
 
+    // Reset button counter
     btnCount = 0;
 
-    memset (&sa, 0, sizeof (sa));
-    sa.sa_handler = &timer_handler;
-
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = &timer_handler; // Link our signal handler
     sigaction (SIGALRM, &sa, NULL);
 
+    // Set up our timer
     timer.it_value.tv_sec = DELAY;
     timer.it_value.tv_usec = 0;
     timer.it_interval.tv_sec = DELAY;
     timer.it_interval.tv_usec = 0;
     setitimer (ITIMER_REAL, &timer, NULL);
-
-    /* Do busy work. */
     startT = timeInMicroseconds();
+
+    // Finished once the timer runs out
     finished = FALSE;
 
+    // While the timer is still going, check for input
     while(finished == FALSE)    {
         checkBtn();
     }
 
+    // The answer is the no. of button pressed during that time
     answer = btnCount;
-
-    if(answer == 0) {
-        checkBtn();
-    }
 
     return answer;
 }
 
+// Blink the green LED a given number of times
 void blinkGreen(int times)
 {
     struct timespec tim, tim2;
     tim.tv_sec  = 0;
-    tim.tv_nsec = 200000000; 
+    tim.tv_nsec = 200000000;
 
     for(int i = 0; i < times; i++)
     {
@@ -374,11 +389,12 @@ void blinkGreen(int times)
     }
 }
 
+// Blink the red LED the given number of times
 void blinkRed(int times)
 {
     struct timespec tim, tim2;
     tim.tv_sec  = 0;
-    tim.tv_nsec = 200000000; 
+    tim.tv_nsec = 200000000;
 
     for(int i = 0; i < times; i++)
     {
@@ -389,21 +405,26 @@ void blinkRed(int times)
     }
 }
 
+// Our main, where all the fun stuff happens
 int main(int argc, char *argv[])
 {
-    int code_length     = 0;
-    int no_colours      = 0;
-    int chosenColour    = 0;
+    int secret_length   = 0;    // The no. of digits in our secret
+    int no_colours      = 0;    // The no. of colours we will be using
 
-    system("clear");
+    system("clear");    // Tidy the screen
 
     // Check if being run in sudo
     if (geteuid () != 0)
     {
+        // If not, exit
         printd("User not sudo!\n", 0);
         exit(1);
     }
 
+    // Check the arguments for flags
+    //  -d      Print debug messages
+    //  -b      Print button debug messages
+    //          (moved to an extra flag because they are super annoying)
     for (int x = 0; x < argc; x++)
     {
         if (strcmp(argv[x], "-d") == 0)
@@ -411,35 +432,40 @@ int main(int argc, char *argv[])
             DEBUG = TRUE;
             printd("ACTIVE\n", 0);
             printd("UNIX? %d\n", ((UNIX) ? TRUE : FALSE));
-        }
+        } 
+        else
+        {
+            if (strcmp(argv[x], "-b") == 0)
+            {  
+                BDEBUG = TRUE;
+                printd("BUTTON PRINTING ACTIVE\n", 0);
+            }
+        }   
     }
 
-    initIO();
-    toggleRed(OFF);
-    toggleGreen(OFF);
+    initIO();           // Initiate our GPIO devices
+    toggleRed(OFF);     // Make sure the LEDs are cleared / OFF
+    toggleGreen(OFF);   
 
-    blinkGreen(1);
-    blinkRed(1);
+    blinkGreen(1);      // Blink both of our LEDs once to test 
+    blinkRed(1);        //  they are connected properly
 
     printf("F28HS Coursework 2\n\n");
 
     printf("Please input the length of the code [3 - 10]: ");
     fflush(stdout);
-    // scanf("%d", &code_length);
-    code_length = getInput();
-    printf("%d\n", code_length);
+    secret_length = getInput();
+    printf("%d\n", secret_length);
 
-    while(code_length < 3 || code_length > 10) {
+    while(secret_length < 3 || secret_length > 10) {
         printf("The code must be between 3 and 10 digits long!\n");
         printf("Please input the length of the code [3 - 10]: ");
         fflush(stdout);
-        // scanf("%d", &code_length);
-        code_length = getInput();
-        printf("%d\n", code_length);
+        secret_length = getInput();
+        printf("%d\n", secret_length);
     }
 
     blinkRed(1);
-    // blinkGreen(code_length);
 
     printf("Please input the number of colours [3 - 10]: ");
     fflush(stdout);
@@ -455,22 +481,23 @@ int main(int argc, char *argv[])
     }
 
     blinkRed(1);
-    // blinkGreen(no_colours);
 
     // ============================================================
-    // Choosing secret code
+    //  Choosing secret code
 
-    // Choosing colours
-    int colours[no_colours];
-    int i;
-    int temp;
-    for(i = 0; i < no_colours; i++)
+    int secret[no_colours]; // Where we will store the secret code
+    int i;                  // Loop counter
+    int temp;               // Holds the entered secret digit
+
+    // For every element of the array, request a digit
+    for(i = 0; i < secret_length; i++)
     {
         printf("Choose the colour for position %d: ", i+1);
         fflush(stdout);
         temp = getInput();
         printf("%d\n", temp);
 
+        // If the digit is outwith the given range, ask for another
         while(temp < 1 || temp > no_colours)
         {
             printf("Choose a number between 1 and %d: ", no_colours);
@@ -478,33 +505,116 @@ int main(int argc, char *argv[])
             temp = getInput();
             printf("%d\n", temp);
         }
-        colours[i] = temp;
+        secret[i] = temp;
         blinkRed(1);
-        // blinkGreen(temp);
     }
 
-    //Briefly displays secret code for player one to check
-    printf("Your secret code is: [ ");
+    system("clear");    // Tidy the console again
+
+    // Print the secret if in debug mode
+    if (DEBUG) {
+        printd("[ ", 0);
+
+        for (i = 0; i < no_colours; i++) {
+            printf("%d ", secret[i]);
+        }
+
+        printf("]\n");
+    }
+
+    // =========================================================================
+    //  Actually trying to guess the code now
+
+    printf("\n[PLAYER TWO]\n\nYou have 5 tries to guess the correct code.\n");
+
+    int turnNumber;
+    int guess[secret_length];
+
+    int j;
+    // Array to store which parts of the code have already
+    //  been looked at so we don't count duplicate matching
+    //  colors
+    int checkedIndex[secret_length];    
+
+    // Turn limit: 5.
+    // Completely arbitrary.
+    for (turnNumber = 0; turnNumber < 5; turnNumber++) {
+
+        int correctColour = 0;
+        int correctPlace = 0;
+
+        // Resets checked array to zero
+        for(i = 0; i < secret_length; i++){
+            checkedIndex[i] = 0;
+        }
+
+        printf("\nTURN [%d]\n--------\n", turnNumber + 1);
+
+        printf("Guess: ");
+        fflush(stdout);
+
+        for (i = 0; i < no_colours; i++)
+        {
+            temp = getInput();
+            printf(" %d ", temp);
+            fflush(stdout);
+            blinkRed(1);
+            blinkGreen(temp);
+            guess[i] = temp;
+        }
+
+        blinkRed(2);
+
+        // Checks if the peg is in the right place and has the right colour
+        for(i = 0; i < secret_length; i++)
+        {
+            if(guess[i] == secret[i])
+            {
+                correctPlace++;
+            }
+        }
+
+        // Checks if the peg is the right colour, but not necessarily in the right place
+        for(i = 0; i < secret_length; i++)
+        {
+            for(j = 0; j < secret_length; j++)
+            {
+                if(secret[i] == guess[j] && checkedIndex[i] == 0)
+                {
+                    checkedIndex[i] = 1;
+                    correctColour++;
+                }
+            }
+        }
+        printf("\nCorrect Place: %d\n",correctPlace);
+        printf("Correct Colour: %d\n\n",correctColour);
+
+        if(correctPlace == secret_length)
+        {
+            if(DEBUG) printd("secret_length: %d", secret_length);
+            printf("\n\nYou win!\n\n");
+            exit(0);
+        }
+
+        // for(i = 0; i < secret_length; i++){
+        //     if(guess[i] == secret[i]){
+        //         // printf("\n%d %d", guess[i], secret[i]);
+        //         // printf("\n%d", winCondition);
+        //         winCondition++;
+        //         // printf(" %d", winCondition);
+        //     }
+        // }
+
+    }
+
+    printf("\n\nYou lose :(\n\n");
+
+    printf("Secret code:  ");
     for(i = 0; i < no_colours; i++)
     {
-        printf("%d ", colours[i]);
-    }
-    printf("]\n");
-
-    sleep(3);
-
-    system("clear");
-
-    if(DEBUG) {
-        printd("Secret code:  ", 0);
-        for(i = 0; i < no_colours; i++)
-        {
-            printf(KYEL "%d  " KNRM, colours[i]);
-        }
+        printf("%d  ", secret[i]);
     }
 
-    printf("\n");
-
-    printf("=========================================\n");
+    exit(0);
 
 }
