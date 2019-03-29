@@ -191,6 +191,7 @@ int main(int argc, char *argv[]) {
     int correctColour = 0;
     int j;
     int checkedIndex[code_length];
+    int winCondition = 0;
 
     //This is where the fun begins
     for (turnNumber = 0; turnNumber < 5; turnNumber++) {
@@ -244,5 +245,24 @@ int main(int argc, char *argv[]) {
         }
         printf("\nCorrect Place: %d\n",correctPlace);
         printf("\nCorrect Colour: %d\n\n",correctColour);
+
+        winCondition = 0;
+
+        for(i = 0; i < code_length; i++){
+            if(guess[i] == secret[i]){
+                // printf("\n%d %d", guess[i], secret[i]);
+                // printf("\n%d", winCondition);
+                winCondition++;
+                // printf(" %d", winCondition);
+            }
+        }
+
+        if(winCondition == code_length){
+            printf("\n\nYou win!\n\n");
+            exit(0);
+        }
     }
+
+    printf("\n\nYou lose :(\n\n");
+    exit(0);
 }
