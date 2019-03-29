@@ -66,7 +66,7 @@ typedef int bool;
 static volatile unsigned int gpiobase;
 static volatile uint32_t *gpio;
 
-int DEBUG = TRUE;
+int DEBUG = FALSE;
 
 void printd(char *msg, int var) {
     if (UNIX)  // If the OS is Unix, print using colours
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("\n\n[PLAYER ONE]");
+    printf("\n\n[PLAYER ONE]\n");
 
     //Choosing length of code and number of colours
     int code_length = 0;
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
 
 
     //Choosing colours
-    int colours[no_colours];
+    int secret[no_colours];
     int i;
     int temp;
     for (i = 0; i < no_colours; i++) {
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
             printf("\nChoose a number between 1 and 3: ");
             scanf("%d", &temp);
         }
-        colours[i] = temp;
+        secret[i] = temp;
     }
 
     //Briefly displays secret code for player one to check
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     printf("[ ");
 
     for (i = 0; i < no_colours; i++) {
-        printf("%d ", colours[i]);
+        printf("%d ", secret[i]);
     }
 
     printf("]\n\nChanging to PLAYER TWO in five seconds...\n");
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
         printd("[ ", 0);
 
         for (i = 0; i < no_colours; i++) {
-            printf("%d ", colours[i]);
+            printf("%d ", secret[i]);
         }
 
         printf("]\n");
@@ -187,10 +187,19 @@ int main(int argc, char *argv[]) {
 
     int turnNumber;
     int guess[3];
+    int correctPlace = 0;
+    int correctColour = 0;
+    int j;
+    int checkedIndex[code_length];
 
     //This is where the fun begins
     for (turnNumber = 0; turnNumber < 5; turnNumber++) {
-        
+
+        //Resets checked array to zero
+        for(i = 0; i < code_length; i++){
+            checkedIndex[i] = 0;
+        }
+
         printf("\nTURN [%d]\n--------\n", turnNumber + 1);
 
         for (i = 0; i < no_colours; i++) {
@@ -206,15 +215,34 @@ int main(int argc, char *argv[]) {
         printf("\n[%d] | %d %d %d\n", turnNumber + 1, guess[0], guess[1], guess[2]);
 
 
-        int correctPlace = 0;
-        int correctColour = 0;
-        
-        //Game logic goes here
-        for(i = 0; i < no_colours; i++){
-            if(guess[i] = colours[i]){
+        correctColour = 0;
+        correctPlace = 0;
+
+
+        //Checks if the peg is in the right place and has the right colour
+        for(i = 0; i < code_length; i++){
+            if(guess[i] == secret[i]){
+                // printf("Guess %d", guess[i]);
+                // printf("Colour %d", colours[i]);
                 correctPlace++;
             }
-            printf("\n%d\n",correctPlace);
         }
+
+        //Checks if the peg is the right colour, but not necessarily in the right place
+        for(i = 0; i < code_length; i++){
+            for(j = 0; j < code_length; j++){
+                if(secret[i] == guess[j] && checkedIndex[i] == 0){
+                    // printf("Guess %d", guess[j]);
+                    // printf("Colour %d", colours[i]);
+                    // printf("Found!: %d %d %d\n", secret[i], guess[j], checkedIndex[i]);
+                    checkedIndex[i] = 1;
+                    // printf("Setting checked %d to %d\n", j, checkedIndex[i]);
+                    correctColour++;
+                }
+                // printf("Place: %d %d\n", guess[j], checkedIndex[i]);
+            }
+        }
+        printf("\nCorrect Place: %d\n",correctPlace);
+        printf("\nCorrect Colour: %d\n\n",correctColour);
     }
 }
