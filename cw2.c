@@ -297,35 +297,22 @@ void checkBtn()
     int reg = 13;
     int res = 0;
 
-    asm volatile(
-        "\tLDR R1, %[gpio]\n"
-        "\tADD R0, R1, %[reg]\n"
-        "\tMOV R2, #1\n"
-        "\tMOV R1, %[button]\n"
-        "\tAND R1, #31\n"
-        "\tLSL R2, R1\n"
-        "\tSTR R2, [R0, #0]\n"
-        "\tMOV %[result], R2\n"
-        : [result] "=r" (res)
-        : [button] "r" (BUTTON)
-        , [gpio] "m" (gpio)
-        , [reg] "r" (reg*4)
-        : "r0", "r1", "r2", "cc");
+    // asm volatile(
+    //     "\tLDR R1, %[gpio]\n"
+    //     "\tADD R0, R1, %[reg]\n"
+    //     "\tMOV R2, #1\n"
+    //     "\tMOV R1, %[button]\n"
+    //     "\tAND R1, #31\n"
+    //     "\tLSL R2, R1\n"
+    //     "\tSTR R2, [R0, #0]\n"
+    //     "\tMOV %[result], R2\n"
+    //     : [result] "=r" (res)
+    //     : [button] "r" (BUTTON)
+    //     , [gpio] "m" (gpio)
+    //     , [reg] "r" (reg*4)
+    //     : "r0", "r1", "r2", "cc");
 
-    asm volatile(
-        "\tLDR R1, %[gpio]\n"
-        "\tADD R0, R1, %[reg]\n"
-        "\tMOV R1, %[button]\n"
-        "\tLSL R2, R1\n"
-        // "\tSTR R2, [R0, #0]\n"
-        "\tMOV %[result], R2\n"
-        : [result] "=r" (res)
-        : [button] "r" (BUTTON)
-        , [gpio] "m" (gpio)
-        , [reg] "r" (reg*4)
-        : "r0", "r1", "r2", "cc");
-
-    printf("%d\n", res);
+    // printf("%d\n", res);
 
     if ((*(gpio + 13 /*GPLEV0*/) & (1 << (BUTTON &31))) != 0)
     {
